@@ -11,5 +11,5 @@ fn main() {
 
     let target: Ipv4Addr = args[1].parse()
         .expect("Failed: invalid IPv4 address format.");
-    traceroute::do_traceroute(target, 1);
+    traceroute::do_traceroute(target, 32);
 }
