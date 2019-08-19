@@ -44,14 +44,16 @@ pub fn do_traceroute(
         };
         us.send_to(echo_request, IpAddr::V4(target));
 
-        let mut res = (hop, "###.###.###.###".to_string());
-        res.1 = ur.next()
+        let s = ur.next()
             .ok()
             .map_or(
                 "###.###.###.###".to_string(),
                 |n| n.0.get_source().to_string()
             );
-        print!(" {} {}\n", res.0, res.1);
+        println!(" {: >2} {}", hop, s);
+        if s == target.to_string() {
+            return Ok(())
+        }
     }
 
     Ok(())
