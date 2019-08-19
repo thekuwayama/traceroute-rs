@@ -21,28 +21,23 @@ pub fn do_traceroute(
     target: Ipv4Addr,
     hops: u8
 ) -> Result<(), String> {
-    let (mut us, mut ur) = match transport::transport_channel(
+    let (mut us, mut ur) = transport::transport_channel(
         65535,
         TransportChannelType::Layer3(IpNextHeaderProtocols::Icmp)
-    ) {
-        Ok((us, ur)) => (us, ur),
-        Err(err) => return Err(err.to_string())
-    };
+    ).map_err(|e| e.to_string())?;
+
     let mut ur = transport::ipv4_packet_iter(&mut ur);
 
     for hop in 1..hops + 1 {
         let mut ipv4_raw_packet = [0u8; IP_TOTAL_LENGTH];
         let mut icmp_raw_packet = [0u8; ICMP_HEADER_LENGTH];
-        let echo_request = match gen_echo_request(
+        let echo_request = gen_echo_request(
             &mut ipv4_raw_packet[..],
             &mut icmp_raw_packet[..],
             target,
             hop
-        ) {
-            Some(packet) => packet,
-            None => return Err("Failed: generate ICMP packet.".to_string())
-        };
-        us.send_to(echo_request, IpAddr::V4(target));
+        ).ok_or("Failed: generate ICMP packet.".to_string())?;
+        us.send_to(echo_request, IpAddr::V4(target)).map_err(|e| e.to_string())?;
 
         let s = ur.next()
             .ok()
