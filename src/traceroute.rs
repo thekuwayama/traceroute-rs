@@ -2,6 +2,7 @@ extern crate pnet;
 
 use std::net::Ipv4Addr;
 use std::net::IpAddr;
+use std::time::Duration;
 
 use pnet::packet::Packet;
 use pnet::packet::ip::IpNextHeaderProtocols;
@@ -16,6 +17,7 @@ use pnet::transport::TransportChannelType;
 const IP_HEADER_LENGTH: usize = 20;
 const ICMP_HEADER_LENGTH: usize = 8;
 const IP_TOTAL_LENGTH: usize = IP_HEADER_LENGTH + ICMP_HEADER_LENGTH;
+const ICMP_RECEIVE_TIMEOUT: u64 = 2;
 
 pub fn do_traceroute(
     target: Ipv4Addr,
@@ -35,12 +37,14 @@ pub fn do_traceroute(
         ).ok_or("Failed: generate ICMP packet.".to_string())?;
         us.send_to(echo_request, IpAddr::V4(target)).map_err(|e| e.to_string())?;
 
-        let s = ur.next()
-            .ok()
-            .map_or(
-                "###.###.###.###".to_string(),
-                |n| n.0.get_source().to_string()
-            );
+        // https://github.com/libpnet/libpnet/blob/f34f2b049550db81592844fa91b54d93945ba3f1/pnet_transport/src/lib.rs#L346
+        let s = match ur.next_with_timeout(Duration::new(ICMP_RECEIVE_TIMEOUT, 0)) {
+            Ok(opt) => match opt {
+                Some((_, addr)) => addr.to_string(),
+                None => "###.###.###.###".to_string()
+            },
+            Err(_) => "###.###.###.###".to_string()
+        };
         println!(" {: >2} {}", hop, s);
         if s == target.to_string() {
             return Ok(())
@@ -69,7 +73,7 @@ fn gen_echo_request<'a>(
     let mut icmp_packet = MutableEchoRequestPacket::owned(icmp_raw_packet)?;
     icmp_packet.set_icmp_type(IcmpTypes::EchoRequest);
     icmp_packet.set_identifier(0);
-    icmp_packet.set_sequence_number(0);
+    icmp_packet.set_sequence_number(ttl as u16);
     let checksum = icmp::checksum(&IcmpPacket::new(icmp_packet.packet())?);
     icmp_packet.set_checksum(checksum);
 
