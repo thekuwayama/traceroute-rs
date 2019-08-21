@@ -9,7 +9,8 @@ fn main() {
         panic!("Failed: specify destination IPv4 address.");
     }
 
-    let target: Ipv4Addr = args[1].parse()
+    let target: Ipv4Addr = args[1]
+        .parse()
         .expect("Failed: invalid IPv4 address format.");
 
     if let Err(e) = traceroute::do_traceroute(target, 32) {

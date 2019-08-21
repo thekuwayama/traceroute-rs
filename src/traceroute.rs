@@ -1,63 +1,58 @@
 extern crate pnet;
 
-use std::net::Ipv4Addr;
 use std::net::IpAddr;
+use std::net::Ipv4Addr;
 use std::time::Duration;
 
-use pnet::packet::Packet;
-use pnet::packet::ip::IpNextHeaderProtocols;
-use pnet::packet::ipv4::MutableIpv4Packet;
 use pnet::packet::icmp;
+use pnet::packet::icmp::echo_request::MutableEchoRequestPacket;
 use pnet::packet::icmp::IcmpPacket;
 use pnet::packet::icmp::IcmpTypes;
-use pnet::packet::icmp::echo_request::MutableEchoRequestPacket;
+use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::packet::ipv4::MutableIpv4Packet;
+use pnet::packet::Packet;
 use pnet::transport;
 use pnet::transport::TransportChannelType;
 
-const IP_HEADER_LENGTH: usize = 20;
-const ICMP_HEADER_LENGTH: usize = 8;
-const IP_TOTAL_LENGTH: usize = IP_HEADER_LENGTH + ICMP_HEADER_LENGTH;
 const ICMP_RECEIVE_TIMEOUT: u64 = 2;
 
-pub fn do_traceroute(
-    target: Ipv4Addr,
-    hops: u8
-) -> Result<(), String> {
+pub fn do_traceroute(target: Ipv4Addr, hops: u8) -> Result<(), String> {
     let (mut us, mut ur) = transport::transport_channel(
         65535,
-        TransportChannelType::Layer3(IpNextHeaderProtocols::Icmp)
-    ).map_err(|e| e.to_string())?;
+        TransportChannelType::Layer3(IpNextHeaderProtocols::Icmp),
+    )
+    .map_err(|e| e.to_string())?;
 
     let mut ur = transport::ipv4_packet_iter(&mut ur);
 
     for hop in 1..hops + 1 {
-        let echo_request = gen_echo_request(
-            target,
-            hop
-        ).ok_or("Failed: generate ICMP packet.".to_string())?;
-        us.send_to(echo_request, IpAddr::V4(target)).map_err(|e| e.to_string())?;
+        let echo_request =
+            gen_echo_request(target, hop).ok_or("Failed: generate ICMP packet.".to_string())?;
+        us.send_to(echo_request, IpAddr::V4(target))
+            .map_err(|e| e.to_string())?;
 
         // https://github.com/libpnet/libpnet/blob/f34f2b049550db81592844fa91b54d93945ba3f1/pnet_transport/src/lib.rs#L346
         let s = match ur.next_with_timeout(Duration::new(ICMP_RECEIVE_TIMEOUT, 0)) {
             Ok(opt) => match opt {
                 Some((_, addr)) => addr.to_string(),
-                None => "###.###.###.###".to_string()
+                None => "###.###.###.###".to_string(),
             },
-            Err(_) => "###.###.###.###".to_string()
+            Err(_) => "###.###.###.###".to_string(),
         };
         println!(" {: >2} {}", hop, s);
         if s == target.to_string() {
-            return Ok(())
+            return Ok(());
         }
     }
 
     Ok(())
 }
 
-fn gen_echo_request<'a>(
-    dest: Ipv4Addr,
-    ttl: u8
-) -> Option<MutableIpv4Packet <'a>> {
+fn gen_echo_request<'a>(dest: Ipv4Addr, ttl: u8) -> Option<MutableIpv4Packet<'a>> {
+    const IP_HEADER_LENGTH: usize = 20;
+    const ICMP_HEADER_LENGTH: usize = 8;
+    const IP_TOTAL_LENGTH: usize = IP_HEADER_LENGTH + ICMP_HEADER_LENGTH;
+
     let ipv4_raw_packet = vec![0u8; IP_TOTAL_LENGTH];
     let mut ipv4_packet = MutableIpv4Packet::owned(ipv4_raw_packet)?;
     // IPv4
