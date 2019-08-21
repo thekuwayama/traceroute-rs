@@ -1,5 +1,8 @@
 # traceroute-rs
 
+[![Build Status](https://travis-ci.org/thekuwayama/traceroute-rs.svg?branch=master)](https://travis-ci.org/thekuwayama/traceroute-rs)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://raw.githubusercontent.com/thekuwayama/traceroute-rs/master/LICENSE.txt)
+
 `traceroute-rs` is `traceroute` implemented by Rust.
 
 `traceroute-rs` sends ICMP Echo Request packets with TTL values that gradually increase from packet to packet, starting with a TTL value of one. 
