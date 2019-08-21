@@ -29,11 +29,7 @@ pub fn do_traceroute(
     let mut ur = transport::ipv4_packet_iter(&mut ur);
 
     for hop in 1..hops + 1 {
-        let mut ipv4_raw_packet = [0u8; IP_TOTAL_LENGTH];
-        let mut icmp_raw_packet = [0u8; ICMP_HEADER_LENGTH];
         let echo_request = gen_echo_request(
-            &mut ipv4_raw_packet[..],
-            &mut icmp_raw_packet[..],
             target,
             hop
         ).ok_or("Failed: generate ICMP packet.".to_string())?;
@@ -55,15 +51,11 @@ pub fn do_traceroute(
 }
 
 fn gen_echo_request<'a>(
-    ipv4_raw_packet: &'a mut[u8],
-    icmp_raw_packet: &'a mut[u8],
     dest: Ipv4Addr,
     ttl: u8
 ) -> Option<MutableIpv4Packet <'a>> {
-    debug_assert_eq!(ipv4_raw_packet.len(), IP_TOTAL_LENGTH);
-    debug_assert_eq!(icmp_raw_packet.len(), ICMP_HEADER_LENGTH);
-
-    let mut ipv4_packet = MutableIpv4Packet::new(ipv4_raw_packet)?;
+    let ipv4_raw_packet = vec![0u8; IP_TOTAL_LENGTH];
+    let mut ipv4_packet = MutableIpv4Packet::owned(ipv4_raw_packet)?;
     // IPv4
     ipv4_packet.set_version(4);
     // Internet header length in 32-bit words
@@ -73,13 +65,14 @@ fn gen_echo_request<'a>(
     ipv4_packet.set_next_level_protocol(IpNextHeaderProtocols::Icmp);
     ipv4_packet.set_destination(dest);
 
-    let mut icmp_packet = MutableEchoRequestPacket::new(icmp_raw_packet)?;
+    let icmp_raw_packet = vec![0u8; ICMP_HEADER_LENGTH];
+    let mut icmp_packet = MutableEchoRequestPacket::owned(icmp_raw_packet)?;
     icmp_packet.set_icmp_type(IcmpTypes::EchoRequest);
     icmp_packet.set_identifier(0);
     icmp_packet.set_sequence_number(0);
     let checksum = icmp::checksum(&IcmpPacket::new(icmp_packet.packet())?);
     icmp_packet.set_checksum(checksum);
 
-    ipv4_packet.set_payload(&icmp_raw_packet);
+    ipv4_packet.set_payload(icmp_packet.packet());
     Some(ipv4_packet)
 }
